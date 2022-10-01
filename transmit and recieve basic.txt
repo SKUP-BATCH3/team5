@@ -1,0 +1,149 @@
+
+
+// PIC18F458 Configuration Bit Settings
+
+// 'C' source line config statements
+
+// CONFIG1H
+#pragma config OSC = HS         // Oscillator Selection bits (HS oscillator)
+#pragma config OSCS = OFF       // Oscillator System Clock Switch Enable bit (Oscillator system clock switch option is disabled (main oscillator is source))
+
+// CONFIG2L
+#pragma config PWRT = OFF       // Power-up Timer Enable bit (PWRT disabled)
+#pragma config BOR = OFF        // Brown-out Reset Enable bit (Brown-out Reset disabled)
+#pragma config BORV = 25        // Brown-out Reset Voltage bits (VBOR set to 2.5V)
+
+// CONFIG2H
+#pragma config WDT = OFF        // Watchdog Timer Enable bit (WDT disabled (control is placed on the SWDTEN bit))
+#pragma config WDTPS = 128      // Watchdog Timer Postscale Select bits (1:128)
+
+// CONFIG4L
+#pragma config STVR = OFF       // Stack Full/Underflow Reset Enable bit (Stack Full/Underflow will not cause Reset)
+#pragma config LVP = OFF        // Low-Voltage ICSP Enable bit (Low-Voltage ICSP disabled)
+
+// CONFIG5L
+#pragma config CP0 = OFF        // Code Protection bit (Block 0 (000200-001FFFh) not code protected)
+#pragma config CP1 = OFF        // Code Protection bit (Block 1 (002000-003FFFh) not code protected)
+#pragma config CP2 = OFF        // Code Protection bit (Block 2 (004000-005FFFh) not code protected)
+#pragma config CP3 = OFF        // Code Protection bit (Block 3 (006000-007FFFh) not code protected)
+
+// CONFIG5H
+#pragma config CPB = OFF        // Boot Block Code Protection bit (Boot Block (000000-0001FFh) not code protected)
+#pragma config CPD = OFF        // Data EEPROM Code Protection bit (Data EEPROM not code protected)
+
+// CONFIG6L
+#pragma config WRT0 = OFF       // Write Protection bit (Block 0 (000200-001FFFh) not write protected)
+#pragma config WRT1 = OFF       // Write Protection bit (Block 1 (002000-003FFFh) not write protected)
+#pragma config WRT2 = OFF       // Write Protection bit (Block 2 (004000-005FFFh) not write protected)
+#pragma config WRT3 = OFF       // Write Protection bit (Block 3 (006000-007FFFh) not write protected)
+
+// CONFIG6H
+#pragma config WRTC = OFF       // Configuration Register Write Protection bit (Configuration registers (300000-3000FFh) not write protected)
+#pragma config WRTB = OFF       // Boot Block Write Protection bit (Boot Block (000000-0001FFh) not write protected)
+#pragma config WRTD = OFF       // Data EEPROM Write Protection bit (Data EEPROM not write protected)
+
+// CONFIG7L
+#pragma config EBTR0 = OFF      // Table Read Protection bit (Block 0 (000200-001FFFh) not protected from Table Reads executed in other blocks)
+#pragma config EBTR1 = OFF      // Table Read Protection bit (Block 1 (002000-003FFFh) not protected from Table Reads executed in other blocks)
+#pragma config EBTR2 = OFF      // Table Read Protection bit (Block 2 (004000-005FFFh) not protected from Table Reads executed in other blocks)
+#pragma config EBTR3 = OFF      // Table Read Protection bit (Block 3 (006000-007FFFh) not protected from Table Reads executed in other blocks)
+
+// CONFIG7H
+#pragma config EBTRB = OFF      // Boot Block Table Read Protection bit (Boot Block (000000-0001FFh) not protected from Table Reads executed in other blocks)
+
+#include <xc.h>
+#define _XTAL_FREQ 20000000
+#define ENABLE 1
+#define DISABLE 0
+int msg[3];
+void system_init(void)
+{
+ INTCONbits.GIE=ENABLE;
+ INTCONbits.PEIE=ENABLE;
+}
+void can_init(void)
+{
+    TRISBbits.RB3 = ENABLE; 
+    TRISBbits.RB2 = DISABLE;
+    PIE3bits.RXB0IE = ENABLE;
+    IPR3bits.RXB0IP = ENABLE;
+    CANCON |=0x80;
+    while(CANSTAT !=0x80);  //baud rate is 250khz
+    BRGCON1=0xC1;
+    BRGCON2=0xAE;
+    BRGCON3=0x45;
+    CIOCON=0x20;
+    CANCON=0x08;  
+}
+void transmit()
+{
+ CANCON=0x08;
+ TXB1SIDH=0xff;
+ TXB1SIDL=0x80;
+ TXB1DLC=0x08;
+ TXB1D0=0X80; 
+TXB1D1=0X00; 
+TXB1D2=0X00;  
+TXB1CON=0x08;
+return;
+ }
+void receive()
+{
+ CANCON=0x08;
+ RXM1SIDH=0xff;
+ RXM1SIDL=0x80;
+ RXB1DLC=0x08;
+ RXERRCNT=0x08;
+ RXB1CON=0x08;
+ msg[0]=RXB0D0;      
+ msg[1]=RXB0D1;     
+ msg[2]=RXB0D2;     
+ RXB0CONbits.RXFUL=1;
+ RXB0CON=0x08; 
+ 
+}
+void set_baudrate()  
+{
+    
+        CANCON=0x80;     //CANCON into configuration mode.
+        BRGCON1=0xC1;   
+        BRGCON2=0xAE;    //
+        BRGCON3=0x45;
+        CIOCON=0x20;
+        CANCON=0x00;    //CANCON into normal mode.
+        __delay_ms(100); 
+    
+}
+
+void mask_set() 
+{
+    CANCON=0x80;   //CANCON into Configuration mode.
+    RXM0SIDL=0x00; //Enable acceptance mask 0 standard identifier mask low byte.
+    RXM0SIDH=0x00; //Enable acceptance mask 0 standard identifier mask high byte.
+    CANCON=0x00;   //CANCON into Normal mode.
+    __delay_ms(100);    
+    
+}
+
+void filter_set()
+{
+    CANCON=0x80;   //CANCON into Configuration mode.
+    RXF0SIDH=0x00; //Enable acceptance Filter 0 standard identifier high byte.
+    RXF0SIDL=0x00; //Enable acceptance Filter 0 standard identifier low byte.
+    CANCON=0x00;   //CANCON into Normal mode.
+    __delay_ms(100);    
+}
+
+
+void main(){  
+   
+    system_init();
+    can_init();
+    mask_set();
+    filter_set();
+       while(1)
+    {
+    transmit();
+    receive();
+    }
+}
